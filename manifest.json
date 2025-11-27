@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Assignment Time Estimator",
+  "version": "1.0.0",
+  "description": "Estimates completion time for Canvas assignments using AI",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "https://*.instructure.com/*",
+    "https://api.openai.com/*",
+    "https://api-inference.huggingface.co/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "host_permissions": [
+    "https://*.instructure.com/*",
+    "https://api.openai.com/*",
+    "https://api-inference.huggingface.co/*",
+    "https://generativelanguage.googleapis.com/*",
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.instructure.com/*",
+        "https://*.canvas.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Assignment Estimator"
+  },
+  "options_page": "options.html"
+}
