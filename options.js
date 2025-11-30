@@ -1,20 +1,38 @@
-// Options page script for managing settings
+/**
+ * Options Page Script for Assignment Estimator
+ * Handles settings management
+ */
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const PROVIDER_NAMES = {
+    huggingface: 'Hugging Face',
+    google: 'Google AI',
+    ollama: 'Ollama',
+    openai: 'OpenAI'
+};
+
+// ============================================================================
+// MAIN CLASS
+// ============================================================================
+
 class SettingsManager {
     constructor() {
-        this.currentProvider = 'huggingface'; // Default to free option
-        this.initializeElements();
+        this.currentProvider = 'ollama';
+        this.initElements();
         this.loadSettings();
         this.bindEvents();
     }
 
-    initializeElements() {
+    initElements() {
         this.tabs = document.querySelectorAll('.tab');
         this.sections = document.querySelectorAll('.provider-section');
         this.status = document.getElementById('status');
         this.saveBtn = document.getElementById('save-btn');
         this.testBtn = document.getElementById('test-btn');
 
-        // Provider-specific elements
         this.elements = {
             huggingface: {
                 apiKey: document.getElementById('hf-api-key'),
@@ -38,8 +56,6 @@ class SettingsManager {
     bindEvents() {
         this.saveBtn.addEventListener('click', () => this.saveSettings());
         this.testBtn.addEventListener('click', () => this.testConnection());
-
-        // Tab switching
         this.tabs.forEach(tab => {
             tab.addEventListener('click', () => this.switchProvider(tab.dataset.provider));
         });
@@ -47,16 +63,8 @@ class SettingsManager {
 
     switchProvider(provider) {
         this.currentProvider = provider;
-
-        // Update tabs
-        this.tabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.provider === provider);
-        });
-
-        // Update sections
-        this.sections.forEach(section => {
-            section.classList.toggle('active', section.dataset.provider === provider);
-        });
+        this.tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === provider));
+        this.sections.forEach(s => s.classList.toggle('active', s.dataset.provider === provider));
     }
 
     async loadSettings() {
@@ -64,48 +72,20 @@ class SettingsManager {
             const result = await chrome.storage.sync.get([
                 'llmProvider',
                 'huggingfaceApiKey', 'huggingfaceModel',
-                'googleApiKey', 'googleModel', 
+                'googleApiKey', 'googleModel',
                 'ollamaUrl', 'ollamaModel',
                 'openaiApiKey', 'openaiModel'
             ]);
-            
-            // Set current provider
-            if (result.llmProvider) {
-                this.switchProvider(result.llmProvider);
-            }
 
-            // Load Hugging Face settings
-            if (result.huggingfaceApiKey) {
-                this.elements.huggingface.apiKey.value = result.huggingfaceApiKey;
-            }
-            if (result.huggingfaceModel) {
-                this.elements.huggingface.model.value = result.huggingfaceModel;
-            }
-
-            // Load Google AI settings
-            if (result.googleApiKey) {
-                this.elements.google.apiKey.value = result.googleApiKey;
-            }
-            if (result.googleModel) {
-                this.elements.google.model.value = result.googleModel;
-            }
-
-            // Load Ollama settings
-            if (result.ollamaUrl) {
-                this.elements.ollama.url.value = result.ollamaUrl;
-            }
-            if (result.ollamaModel) {
-                this.elements.ollama.model.value = result.ollamaModel;
-            }
-
-            // Load OpenAI settings
-            if (result.openaiApiKey) {
-                this.elements.openai.apiKey.value = result.openaiApiKey;
-            }
-            if (result.openaiModel) {
-                this.elements.openai.model.value = result.openaiModel;
-            }
-
+            if (result.llmProvider) this.switchProvider(result.llmProvider);
+            if (result.huggingfaceApiKey) this.elements.huggingface.apiKey.value = result.huggingfaceApiKey;
+            if (result.huggingfaceModel) this.elements.huggingface.model.value = result.huggingfaceModel;
+            if (result.googleApiKey) this.elements.google.apiKey.value = result.googleApiKey;
+            if (result.googleModel) this.elements.google.model.value = result.googleModel;
+            if (result.ollamaUrl) this.elements.ollama.url.value = result.ollamaUrl;
+            if (result.ollamaModel) this.elements.ollama.model.value = result.ollamaModel;
+            if (result.openaiApiKey) this.elements.openai.apiKey.value = result.openaiApiKey;
+            if (result.openaiModel) this.elements.openai.model.value = result.openaiModel;
         } catch (error) {
             console.error('Error loading settings:', error);
         }
@@ -114,56 +94,42 @@ class SettingsManager {
     async saveSettings() {
         try {
             const settings = {
-                llmProvider: this.currentProvider
+                llmProvider: this.currentProvider,
+                huggingfaceApiKey: this.elements.huggingface.apiKey.value.trim(),
+                huggingfaceModel: this.elements.huggingface.model.value,
+                googleApiKey: this.elements.google.apiKey.value.trim(),
+                googleModel: this.elements.google.model.value,
+                ollamaUrl: this.elements.ollama.url.value.trim(),
+                ollamaModel: this.elements.ollama.model.value,
+                openaiApiKey: this.elements.openai.apiKey.value.trim(),
+                openaiModel: this.elements.openai.model.value
             };
 
-            // Save all provider settings
-            settings.huggingfaceApiKey = this.elements.huggingface.apiKey.value.trim();
-            settings.huggingfaceModel = this.elements.huggingface.model.value;
-            
-            settings.googleApiKey = this.elements.google.apiKey.value.trim();
-            settings.googleModel = this.elements.google.model.value;
-            
-            settings.ollamaUrl = this.elements.ollama.url.value.trim();
-            settings.ollamaModel = this.elements.ollama.model.value;
-            
-            settings.openaiApiKey = this.elements.openai.apiKey.value.trim();
-            settings.openaiModel = this.elements.openai.model.value;
-
-            // Validate current provider settings
-            this.validateProviderSettings(settings);
-
-            // Save to Chrome storage
+            this.validateSettings(settings);
             await chrome.storage.sync.set(settings);
-
-            this.showStatus('success', `Settings saved! Using ${this.getProviderName(this.currentProvider)}`);
+            this.showStatus('success', `Settings saved! Using ${PROVIDER_NAMES[this.currentProvider]}`);
         } catch (error) {
-            console.error('Error saving settings:', error);
-            this.showStatus('error', `Error saving settings: ${error.message}`);
+            this.showStatus('error', `Error: ${error.message}`);
         }
     }
 
-    validateProviderSettings(settings) {
+    validateSettings(settings) {
         switch (this.currentProvider) {
             case 'huggingface':
-                if (settings.huggingfaceApiKey && !settings.huggingfaceApiKey.startsWith('hf_')) {
+                if (settings.huggingfaceApiKey && !settings.huggingfaceApiKey.startsWith('hf_'))
                     throw new Error('Hugging Face tokens start with "hf_"');
-                }
                 break;
             case 'google':
-                if (settings.googleApiKey && !settings.googleApiKey.startsWith('AIza')) {
-                    throw new Error('Google AI API keys typically start with "AIza"');
-                }
+                if (settings.googleApiKey && !settings.googleApiKey.startsWith('AIza'))
+                    throw new Error('Google AI API keys start with "AIza"');
                 break;
             case 'ollama':
-                if (settings.ollamaUrl && !settings.ollamaUrl.startsWith('http')) {
+                if (settings.ollamaUrl && !settings.ollamaUrl.startsWith('http'))
                     throw new Error('Ollama URL must start with http:// or https://');
-                }
                 break;
             case 'openai':
-                if (settings.openaiApiKey && !settings.openaiApiKey.startsWith('sk-')) {
+                if (settings.openaiApiKey && !settings.openaiApiKey.startsWith('sk-'))
                     throw new Error('OpenAI API keys start with "sk-"');
-                }
                 break;
         }
     }
@@ -172,35 +138,14 @@ class SettingsManager {
         try {
             this.testBtn.disabled = true;
             this.testBtn.textContent = 'Testing...';
-            this.showStatus('info', `Testing ${this.getProviderName(this.currentProvider)} connection...`);
+            this.showStatus('info', `Testing ${PROVIDER_NAMES[this.currentProvider]}...`);
 
-            // Get current provider config
-            const config = this.getCurrentProviderConfig();
-            
-            if (!config.hasRequiredFields) {
-                throw new Error('Please fill in the required fields first');
-            }
+            const config = this.getConfig();
+            if (!config.hasRequiredFields) throw new Error('Please fill in required fields');
 
-            // Test based on provider
-            switch (this.currentProvider) {
-                case 'huggingface':
-                    await this.testHuggingFace(config);
-                    break;
-                case 'google':
-                    await this.testGoogleAI(config);
-                    break;
-                case 'ollama':
-                    await this.testOllama(config);
-                    break;
-                case 'openai':
-                    await this.testOpenAI(config);
-                    break;
-            }
-
-            this.showStatus('success', `${this.getProviderName(this.currentProvider)} connection successful!`);
-
+            await this.testProvider(config);
+            this.showStatus('success', `${PROVIDER_NAMES[this.currentProvider]} connection successful!`);
         } catch (error) {
-            console.error('Test failed:', error);
             this.showStatus('error', `Test failed: ${error.message}`);
         } finally {
             this.testBtn.disabled = false;
@@ -208,7 +153,7 @@ class SettingsManager {
         }
     }
 
-    getCurrentProviderConfig() {
+    getConfig() {
         switch (this.currentProvider) {
             case 'huggingface':
                 return {
@@ -237,102 +182,46 @@ class SettingsManager {
         }
     }
 
-    async testHuggingFace(config) {
-        const response = await fetch(`https://api-inference.huggingface.co/models/${config.model}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                inputs: 'Test connection. Respond with "OK".',
-                parameters: { max_new_tokens: 5, temperature: 0.1 }
-            })
-        });
+    async testProvider(config) {
+        let url, body, headers;
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Hugging Face API error: ${errorData.error || response.statusText}`);
+        switch (this.currentProvider) {
+            case 'huggingface':
+                url = `https://api-inference.huggingface.co/models/${config.model}`;
+                headers = { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' };
+                body = { inputs: 'Test', parameters: { max_new_tokens: 5 } };
+                break;
+            case 'google':
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+                headers = { 'Content-Type': 'application/json' };
+                body = { contents: [{ parts: [{ text: 'Test' }] }], generationConfig: { maxOutputTokens: 5 } };
+                break;
+            case 'ollama':
+                url = `${config.url}/api/generate`;
+                headers = { 'Content-Type': 'application/json' };
+                body = { model: config.model, prompt: 'Test', stream: false, options: { num_predict: 5 } };
+                break;
+            case 'openai':
+                url = 'https://api.openai.com/v1/chat/completions';
+                headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` };
+                body = { model: config.model, messages: [{ role: 'user', content: 'Test' }], max_tokens: 5 };
+                break;
         }
-    }
 
-    async testGoogleAI(config) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: 'Test connection. Respond with "OK".' }] }],
-                generationConfig: { maxOutputTokens: 5 }
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Google AI error: ${errorData.error?.message || response.statusText}`);
-        }
-    }
-
-    async testOllama(config) {
-        const response = await fetch(`${config.url}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: config.model,
-                prompt: 'Test connection. Respond with "OK".',
-                stream: false,
-                options: { num_predict: 5 }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Ollama error: ${response.statusText}. Make sure Ollama is running and the model is installed.`);
-        }
-    }
-
-    async testOpenAI(config) {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            },
-            body: JSON.stringify({
-                model: config.model,
-                messages: [{ role: 'user', content: 'Test connection. Respond with "OK".' }],
-                max_tokens: 5
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`OpenAI error: ${errorData.error?.message || response.statusText}`);
-        }
-    }
-
-    getProviderName(provider) {
-        const names = {
-            huggingface: 'Hugging Face',
-            google: 'Google AI',
-            ollama: 'Ollama',
-            openai: 'OpenAI'
-        };
-        return names[provider] || provider;
+        const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     }
 
     showStatus(type, message) {
         this.status.className = `status ${type}`;
         this.status.textContent = message;
         this.status.style.display = 'block';
-        
-        if (type === 'success') {
-            setTimeout(() => {
-                this.status.style.display = 'none';
-            }, 3000);
-        }
+        if (type === 'success') setTimeout(() => { this.status.style.display = 'none'; }, 3000);
     }
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new SettingsManager();
-});
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => new SettingsManager());

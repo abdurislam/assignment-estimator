@@ -1,278 +1,375 @@
-// Popup script for handling user interactions
-class AssignmentEstimator {
+/**
+ * Popup Script for Assignment Estimator
+ * Handles the extension popup UI
+ */
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const PAGE_TYPE_LABELS = {
+    dashboard: 'Canvas Dashboard',
+    assignment_detail: 'Assignment Page',
+    assignments_list: 'Assignments List',
+    modules: 'Course Modules',
+    syllabus: 'Course Syllabus',
+    course_home: 'Course Home',
+    other: 'Canvas Page'
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function cleanTitle(title) {
+    if (!title) return '';
+    let t = title;
+    t = t.replace(/\s+[A-Z]{2,8}[_-][A-Z0-9-]+/gi, '');
+    t = t.replace(/\s*\d+\s+out\s+of\s+\d+/gi, '');
+    t = t.replace(/\s*"[^"]*"/g, '');
+    return t.trim();
+}
+
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+}
+
+function formatDate(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[date.getMonth()]} ${date.getDate()}`;
+}
+
+function showStatus(element, type, message, autoHide = 0) {
+    element.className = `status ${type}`;
+    element.textContent = message;
+    element.style.display = 'block';
+    if (autoHide > 0) {
+        setTimeout(() => { element.style.display = 'none'; }, autoHide);
+    }
+}
+
+// ============================================================================
+// WEEKLY GROUPING
+// ============================================================================
+
+function groupByWeek(estimates) {
+    const weeks = {};
+    const now = new Date();
+    const currentWeekStart = getWeekStart(now);
+
+    estimates.forEach(assignment => {
+        const isCompleted = /\d+\s+out\s+of\s+\d+/i.test(assignment.title);
+        let weekKey, weekLabel, weekStart;
+
+        if (isCompleted) {
+            weekKey = 'completed';
+            weekLabel = '✅ Completed';
+            weekStart = null;
+        } else if (!assignment.dueDate) {
+            weekKey = 'no-date';
+            weekLabel = '📋 No Due Date';
+            weekStart = null;
+        } else {
+            const dueDate = new Date(assignment.dueDate);
+            weekStart = getWeekStart(dueDate);
+            weekKey = weekStart.toISOString().split('T')[0];
+            const diffDays = Math.floor((weekStart - currentWeekStart) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) weekLabel = '📍 This Week';
+            else if (diffDays === 7) weekLabel = '📅 Next Week';
+            else if (diffDays < 0) weekLabel = '⏰ Overdue';
+            else weekLabel = `Week ${Math.ceil(diffDays / 7) + 1} (${formatDate(weekStart)})`;
+        }
+
+        if (!weeks[weekKey]) {
+            weeks[weekKey] = {
+                label: weekLabel,
+                weekStart,
+                assignments: [],
+                totalHours: 0,
+                isCurrentWeek: weekKey === currentWeekStart.toISOString().split('T')[0],
+                isCompleted: weekKey === 'completed',
+                isPast: weekStart && weekStart < currentWeekStart
+            };
+        }
+
+        const hours = typeof assignment.estimate === 'number' ? assignment.estimate : 0;
+        weeks[weekKey].assignments.push(assignment);
+        weeks[weekKey].totalHours += hours;
+    });
+
+    return Object.entries(weeks).sort((a, b) => {
+        if (a[0] === 'completed') return 1;
+        if (b[0] === 'completed') return -1;
+        if (a[0] === 'no-date') return 1;
+        if (b[0] === 'no-date') return -1;
+        return new Date(a[0]) - new Date(b[0]);
+    });
+}
+
+function calculateStats(estimates) {
+    let totalHours = 0, upcomingCount = 0, completedCount = 0;
+
+    estimates.forEach(a => {
+        const hours = typeof a.estimate === 'number' ? a.estimate : 0;
+        totalHours += hours;
+        if (/\d+\s+out\s+of\s+\d+/i.test(a.title) || a.dueDate === null) {
+            completedCount++;
+        } else {
+            upcomingCount++;
+        }
+    });
+
+    return { totalHours, upcomingCount, completedCount };
+}
+
+// ============================================================================
+// RENDERERS
+// ============================================================================
+
+function renderWeeklyView(container, weeklyData) {
+    container.innerHTML = '';
+    const maxHours = Math.max(...weeklyData.map(([_, w]) => w.totalHours), 10);
+
+    weeklyData.forEach(([_, week]) => {
+        const section = document.createElement('div');
+        section.className = 'week-section';
+
+        let headerClass = 'week-header';
+        if (week.isCurrentWeek) headerClass += ' current-week';
+        else if (week.isPast || week.isCompleted) headerClass += ' past-week';
+
+        let barClass = 'week-bar-fill';
+        if (week.totalHours > 15) barClass += ' heavy';
+        else if (week.totalHours > 8) barClass += ' moderate';
+
+        const barWidth = (week.totalHours / maxHours) * 100;
+
+        section.innerHTML = `
+            <div class="${headerClass}">
+                <span class="week-title">${week.label}</span>
+                <span class="week-stats">${week.assignments.length} items • ${week.totalHours.toFixed(1)}h</span>
+            </div>
+            <div class="week-bar">
+                <div class="${barClass}" style="width: ${barWidth}%"></div>
+            </div>
+            <div class="week-assignments">
+                ${week.assignments.map(a => {
+                    const title = cleanTitle(a.title);
+                    const hours = typeof a.estimate === 'number' ? a.estimate : 0;
+                    return `<div class="week-assignment-item">
+                        <span class="week-assignment-title" title="${title}">${title}</span>
+                        <span class="week-assignment-hours">${hours}h</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
+        container.appendChild(section);
+    });
+}
+
+function renderChartView(container, weeklyData) {
+    container.innerHTML = '';
+    const upcoming = weeklyData.filter(([k]) => k !== 'completed' && k !== 'no-date').slice(0, 6);
+
+    if (upcoming.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No upcoming assignments</div>';
+        return;
+    }
+
+    const maxHours = Math.max(...upcoming.map(([_, w]) => w.totalHours), 10);
+
+    upcoming.forEach(([_, week], i) => {
+        const barHeight = (week.totalHours / maxHours) * 80;
+        const barContainer = document.createElement('div');
+        barContainer.className = 'chart-bar-container';
+        barContainer.innerHTML = `
+            <div class="chart-bar-value">${week.totalHours.toFixed(1)}h</div>
+            <div class="chart-bar ${week.isCurrentWeek ? 'current' : ''}" style="height: ${barHeight}px"></div>
+            <div class="chart-bar-label">${week.isCurrentWeek ? 'This' : 'Wk ' + (i + 1)}</div>
+        `;
+        container.appendChild(barContainer);
+    });
+}
+
+function renderAllAssignments(container, estimates, pageType) {
+    container.innerHTML = '';
+
+    estimates.forEach(assignment => {
+        const item = document.createElement('div');
+        item.className = 'assignment-item';
+        const title = cleanTitle(assignment.title);
+
+        let dueDateDisplay = '', dueDateClass = 'assignment-due';
+        if (assignment.dueDate) {
+            const dueDate = new Date(assignment.dueDate);
+            const daysUntil = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+            if (daysUntil < 0) {
+                dueDateDisplay = `⚠️ Overdue (${assignment.dueDate})`;
+                dueDateClass += ' urgent';
+            } else if (daysUntil <= 2) {
+                dueDateDisplay = `🔥 Due ${assignment.dueDate}`;
+                dueDateClass += ' urgent';
+            } else {
+                dueDateDisplay = `📅 Due ${assignment.dueDate}`;
+            }
+        } else if (/\d+\s+out\s+of\s+\d+/i.test(assignment.title)) {
+            dueDateDisplay = '✅ Completed';
+            dueDateClass += ' completed';
+        } else {
+            dueDateDisplay = '📋 No due date';
+        }
+
+        const courseInfo = assignment.course && pageType === 'dashboard'
+            ? `<div class="assignment-course">📚 ${assignment.course}</div>` : '';
+
+        item.innerHTML = `
+            ${courseInfo}
+            <div class="assignment-title">${title}</div>
+            <div class="assignment-meta">
+                <span class="assignment-estimate">⏱️ ${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</span>
+                <span class="${dueDateClass}">${dueDateDisplay}</span>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// ============================================================================
+// MAIN CLASS
+// ============================================================================
+
+class AssignmentEstimatorPopup {
     constructor() {
-        console.log('[Popup] Initializing AssignmentEstimator');
-        this.initializeElements();
+        this.initElements();
         this.bindEvents();
         this.checkCurrentPage();
     }
 
-    initializeElements() {
-        console.log('[Popup] Initializing DOM elements');
+    initElements() {
         this.analyzeBtn = document.getElementById('analyze-btn');
         this.status = document.getElementById('status');
         this.assignmentsContainer = document.getElementById('assignments-container');
         this.assignmentsList = document.getElementById('assignments-list');
-        this.totalTime = document.getElementById('total-time');
         this.settingsLink = document.getElementById('settings-link');
-        
-        console.log('[Popup] DOM elements initialized:', {
-            analyzeBtn: !!this.analyzeBtn,
-            status: !!this.status,
-            assignmentsContainer: !!this.assignmentsContainer,
-            assignmentsList: !!this.assignmentsList,
-            totalTime: !!this.totalTime,
-            settingsLink: !!this.settingsLink
-        });
+        this.weeksContainer = document.getElementById('weeks-container');
+        this.chartBars = document.getElementById('chart-bars');
+        this.tabs = document.querySelectorAll('.tab');
+        this.tabContents = document.querySelectorAll('.tab-content');
     }
 
     bindEvents() {
-        console.log('[Popup] Binding event listeners');
-        this.analyzeBtn.addEventListener('click', () => {
-            console.log('[Popup] Analyze button clicked');
-            this.analyzeAssignments();
-        });
-        this.settingsLink.addEventListener('click', () => {
-            console.log('[Popup] Settings link clicked');
-            this.openSettings();
+        this.analyzeBtn.addEventListener('click', () => this.analyze());
+        this.settingsLink.addEventListener('click', () => chrome.runtime.openOptionsPage());
+        this.tabs.forEach(tab => {
+            tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
         });
     }
 
+    switchTab(tabName) {
+        this.tabs.forEach(t => t.classList.remove('active'));
+        this.tabContents.forEach(tc => tc.classList.remove('active'));
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-view`).classList.add('active');
+    }
+
     async checkCurrentPage() {
-        console.log('[Popup] Checking current page');
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            console.log('[Popup] Current tab:', tab);
-            console.log('[Popup] Current URL:', tab.url);
-            
             if (!tab.url.includes('instructure.com') && !tab.url.includes('canvas.com')) {
-                console.warn('[Popup] Not on a Canvas page');
-                this.showStatus('error', 'Please navigate to a Canvas page first');
+                showStatus(this.status, 'error', 'Please navigate to a Canvas page first');
                 this.analyzeBtn.disabled = true;
                 return;
             }
 
-            console.log('[Popup] On Canvas page, proceeding');
-            // Update button text based on page type
-            const pageInfo = this.getPageTypeInfo(tab.url);
-            console.log('[Popup] Page info:', pageInfo);
+            const pageInfo = this.getPageInfo(tab.url);
             this.analyzeBtn.textContent = pageInfo.buttonText;
-            
-            // Show helpful hint
-            if (pageInfo.hint) {
-                console.log('[Popup] Showing page hint');
-                this.showStatus('info', pageInfo.hint);
-            }
-
+            if (pageInfo.hint) showStatus(this.status, 'info', pageInfo.hint);
         } catch (error) {
-            console.error('[Popup] Error checking current page:', error);
+            console.error('[Popup] Error:', error);
         }
     }
 
-    getPageTypeInfo(url) {
-        console.log('[Popup] Getting page type info for URL:', url);
+    getPageInfo(url) {
         const path = new URL(url).pathname;
-        console.log('[Popup] URL pathname:', path);
-        
         if (path === '/' || path.includes('/dashboard') || url.includes('dashboard')) {
-            console.log('[Popup] Detected dashboard page');
-            return {
-                buttonText: 'Analyze Dashboard Assignments',
-                hint: 'This will analyze assignments from your Canvas dashboard'
-            };
-        } else if (path.includes('/assignments/') && path.match(/\/assignments\/\d+/)) {
-            console.log('[Popup] Detected assignment detail page');
-            return {
-                buttonText: 'Estimate This Assignment',
-                hint: 'This will estimate the current assignment you\'re viewing'
-            };
-        } else if (path.includes('/assignments')) {
-            console.log('[Popup] Detected assignments list page');
-            return {
-                buttonText: 'Analyze Course Assignments',
-                hint: 'This will analyze all assignments in this course'
-            };
-        } else if (path.includes('/modules')) {
-            console.log('[Popup] Detected modules page');
-            return {
-                buttonText: 'Analyze Module Assignments',
-                hint: 'This will analyze assignments from course modules'
-            };
-        } else if (path.match(/\/courses\/\d+$/)) {
-            console.log('[Popup] Detected course home page');
-            return {
-                buttonText: 'Analyze Course Home',
-                hint: 'This will look for assignments on the course home page'
-            };
-        } else {
-            console.log('[Popup] Detected other Canvas page');
-            return {
-                buttonText: 'Analyze Canvas Assignments',
-                hint: 'Navigate to assignments, modules, or dashboard for best results'
-            };
+            return { buttonText: 'Analyze Dashboard Assignments', hint: 'Analyze assignments from your Canvas dashboard' };
         }
+        if (path.includes('/assignments/') && path.match(/\/assignments\/\d+/)) {
+            return { buttonText: 'Estimate This Assignment', hint: 'Estimate the current assignment' };
+        }
+        if (path.includes('/assignments')) {
+            return { buttonText: 'Analyze Course Assignments', hint: 'Analyze all assignments in this course' };
+        }
+        if (path.includes('/modules')) {
+            return { buttonText: 'Analyze Module Assignments', hint: 'Analyze assignments from course modules' };
+        }
+        return { buttonText: 'Analyze Canvas Assignments', hint: 'Navigate to assignments or dashboard for best results' };
     }
 
-    async analyzeAssignments() {
-        console.log('[Popup] Starting assignment analysis');
+    async analyze() {
         try {
-            this.showStatus('loading', 'Scanning Canvas page for assignments...');
+            showStatus(this.status, 'loading', 'Scanning Canvas page...');
             this.analyzeBtn.disabled = true;
 
-            // Check if we're on a Canvas page
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            console.log('[Popup] Got current tab for analysis:', tab);
-            
             if (!tab.url.includes('instructure.com') && !tab.url.includes('canvas.com')) {
                 throw new Error('Please navigate to your Canvas page first');
             }
 
-            console.log('[Popup] Sending message to content script');
-            // Get Canvas assignments from content script
             const response = await chrome.tabs.sendMessage(tab.id, { action: 'getAssignments' });
-            console.log('[Popup] Received response from content script:', response);
-            
-            if (!response.success) {
-                console.error('[Popup] Content script returned error:', response.error);
-                throw new Error(response.error || 'Failed to fetch assignments');
-            }
+            if (!response.success) throw new Error(response.error || 'Failed to fetch assignments');
 
-            console.log('[Popup] Successfully got assignments from content script:', response.assignments);
+            showStatus(this.status, 'loading', `Found ${response.assignments.length} assignments. Analyzing...`);
 
-            // Show page type info
-            const pageTypeDisplay = this.getPageTypeDisplay(response.pageType);
-            console.log('[Popup] Page type display:', pageTypeDisplay);
-            this.showStatus('loading', `Found ${response.assignments.length} assignments on ${pageTypeDisplay}. Analyzing with AI...`);
-
-            // Process assignments with LLM
-            console.log('[Popup] Starting LLM estimation for assignments');
             const estimates = await this.getEstimates(response.assignments);
-            console.log('[Popup] Completed LLM estimation:', estimates);
-            
             this.displayResults(estimates, response.pageType);
-            this.showStatus('success', `Analysis complete! Found ${estimates.length} assignments from ${pageTypeDisplay}`);
+            showStatus(this.status, 'success', `Analysis complete! ${estimates.length} assignments`, 3000);
 
         } catch (error) {
-            console.error('[Popup] Error analyzing assignments:', error);
-            this.showStatus('error', error.message);
-            
-            // Provide helpful suggestions based on error
-            if (error.message.includes('No assignments found')) {
-                console.log('[Popup] Showing navigation suggestions');
-                setTimeout(() => {
-                    this.showStatus('info', 'Try: Canvas Dashboard → Assignments → Modules → Course Pages');
-                }, 3000);
-            }
+            console.error('[Popup] Error:', error);
+            showStatus(this.status, 'error', error.message);
         } finally {
-            console.log('[Popup] Re-enabling analyze button');
             this.analyzeBtn.disabled = false;
         }
     }
 
     async getEstimates(assignments) {
-        console.log('[Popup] Getting estimates for assignments:', assignments);
         const estimates = [];
-        
-        for (let i = 0; i < assignments.length; i++) {
-            const assignment = assignments[i];
-            console.log(`[Popup] Processing assignment ${i + 1}/${assignments.length}:`, assignment);
-            
+        for (const assignment of assignments) {
             try {
-                const estimate = await this.estimateAssignment(assignment);
-                console.log(`[Popup] Got estimate for assignment "${assignment.title}":`, estimate);
-                estimates.push({ ...assignment, estimate });
+                const response = await chrome.runtime.sendMessage({
+                    action: 'estimateTime',
+                    assignment
+                });
+                estimates.push({ ...assignment, estimate: response.estimate || 'Unknown' });
             } catch (error) {
-                console.error(`[Popup] Error estimating assignment ${assignment.title}:`, error);
                 estimates.push({ ...assignment, estimate: 'Error' });
             }
         }
-        
-        console.log('[Popup] All estimates completed:', estimates);
         return estimates;
     }
 
-    async estimateAssignment(assignment) {
-        console.log('[Popup] Sending assignment to background script for estimation:', assignment);
-        // Send to background script for LLM API call
-        const response = await chrome.runtime.sendMessage({
-            action: 'estimateTime',
-            assignment: assignment
-        });
-
-        console.log('[Popup] Received estimate response:', response);
-        return response.estimate || 'Unknown';
-    }
-
-    getPageTypeDisplay(pageType) {
-        const displays = {
-            'dashboard': 'Canvas Dashboard',
-            'assignment_detail': 'Assignment Page',
-            'assignments_list': 'Assignments List',
-            'modules': 'Course Modules',
-            'syllabus': 'Course Syllabus',
-            'course_home': 'Course Home',
-            'other': 'Canvas Page'
-        };
-        return displays[pageType] || 'Canvas Page';
-    }
-
     displayResults(estimates, pageType) {
-        this.assignmentsList.innerHTML = '';
-        let totalHours = 0;
+        const stats = calculateStats(estimates);
+        document.getElementById('total-hours').textContent = stats.totalHours.toFixed(1);
+        document.getElementById('upcoming-count').textContent = stats.upcomingCount;
+        document.getElementById('completed-count').textContent = stats.completedCount;
 
-        estimates.forEach(assignment => {
-            const item = document.createElement('div');
-            item.className = 'assignment-item';
-            
-            const estimateHours = typeof assignment.estimate === 'number' ? assignment.estimate : 0;
-            totalHours += estimateHours;
+        const weeklyData = groupByWeek(estimates);
+        renderWeeklyView(this.weeksContainer, weeklyData);
+        renderChartView(this.chartBars, weeklyData);
+        renderAllAssignments(this.assignmentsList, estimates, pageType);
 
-            // Show course info if available and from dashboard
-            const courseInfo = assignment.course && pageType === 'dashboard' 
-                ? `<div style="font-size: 11px; color: #888; margin-bottom: 3px;">📚 ${assignment.course}</div>`
-                : '';
-
-            // Show source info for debugging
-            const sourceInfo = assignment.source 
-                ? `<div style="font-size: 10px; color: #aaa; margin-top: 5px;">Source: ${assignment.source}</div>`
-                : '';
-
-            item.innerHTML = `
-                ${courseInfo}
-                <div class="assignment-title">${assignment.title}</div>
-                <div class="assignment-estimate">⏱️ ${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</div>
-                <div class="assignment-due">📅 Due: ${assignment.dueDate || 'No due date'}</div>
-                ${assignment.description ? `<div style="font-size: 12px; color: #666; margin-top: 5px;">${assignment.description.substring(0, 100)}...</div>` : ''}
-                ${sourceInfo}
-            `;
-            
-            this.assignmentsList.appendChild(item);
-        });
-
-        const pageTypeDisplay = this.getPageTypeDisplay(pageType);
-        this.totalTime.innerHTML = `📊 Total estimated time: <span style="color: #1976d2;">${totalHours.toFixed(1)} hours</span><br>
-                                   <small style="color: #666;">from ${pageTypeDisplay}</small>`;
         this.assignmentsContainer.style.display = 'block';
-    }
-
-    showStatus(type, message) {
-        this.status.className = `status ${type}`;
-        this.status.textContent = message;
-        this.status.style.display = 'block';
-        
-        if (type === 'success') {
-            setTimeout(() => {
-                this.status.style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    openSettings() {
-        chrome.runtime.openOptionsPage();
     }
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new AssignmentEstimator();
-});
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => new AssignmentEstimatorPopup());
