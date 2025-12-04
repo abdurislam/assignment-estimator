@@ -1,8 +1,8 @@
-# 📚 Assignment Time Estimator Chrome Extension
+# Assignment Time Estimator Chrome Extension
 
 A Chrome extension that analyzes Canvas assignments and uses AI to estimate completion time, helping students better plan their workload.
 
-## 🚀 Features
+## Features
 
 - **Canvas Integration**: Automatically extracts assignment details from Canvas pages
 - **Multiple AI Providers**: Supports Ollama (local), Google AI, Hugging Face, and OpenAI
@@ -11,7 +11,7 @@ A Chrome extension that analyzes Canvas assignments and uses AI to estimate comp
 - **Multiple Canvas Views**: Supports dashboard, assignments, modules, and syllabus
 - **Time Aggregation**: Shows total estimated time and per-week breakdown
 
-## 📋 Installation
+## Installation
 
 ### Load Unpacked Extension (Development)
 
@@ -21,7 +21,7 @@ A Chrome extension that analyzes Canvas assignments and uses AI to estimate comp
 4. **Click "Load unpacked"** and select the project folder
 5. **Pin the extension** to your toolbar for easy access
 
-## ⚙️ Setup
+## Setup
 
 ### Option 1: Ollama (Recommended - Free & Private)
 
@@ -47,7 +47,7 @@ A Chrome extension that analyzes Canvas assignments and uses AI to estimate comp
 
 Works without any API using rule-based estimation based on assignment type and keywords.
 
-## 🎯 Usage
+## Usage
 
 1. **Navigate to Canvas** - Go to any Canvas page
 2. **Open the extension** - Click the extension icon
@@ -60,7 +60,7 @@ Works without any API using rule-based estimation based on assignment type and k
 - Course modules (`/courses/{id}/modules`)
 - Individual assignment pages
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 assignment-estimator/
@@ -109,14 +109,14 @@ assignment-estimator/
 3. **Fallback**: If LLM fails, uses keyword-based estimation
 4. **Display**: Popup groups by week and renders charts
 
-## 🔒 Privacy & Security
+## Privacy & Security
 
 - **Local-first**: Ollama runs entirely on your machine
 - **API keys stored locally** in Chrome's secure storage
 - **No data collection** - all processing is local or direct to chosen API
 - **Canvas permissions** only for reading assignment data
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Ollama Connection Issues
 ```bash
@@ -132,17 +132,7 @@ sudo systemctl edit snap.ollama.ollama.service
 sudo snap restart ollama
 ```
 
-### "No assignments found"
-- Make sure you're on a Canvas page (instructure.com)
-- Try the Canvas dashboard for best results
-- Check browser console for errors
-
-### API Errors
-- Verify API key is correct in settings
-- Test connection using the "Test Connection" button
-- Check that the selected model is available
-
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Feel free to:
 - Report bugs or issues
@@ -150,6 +140,6 @@ Contributions welcome! Feel free to:
 - Submit pull requests
 - Improve Canvas parsing logic
 
-## 📄 License
+## License
 
 MIT License - feel free to modify and distribute as needed.

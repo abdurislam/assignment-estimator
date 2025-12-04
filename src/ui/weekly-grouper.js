@@ -53,7 +53,7 @@ function categorizeAssignment(assignment, currentWeekStart) {
     if (isCompleted) {
         return {
             weekKey: 'completed',
-            weekLabel: '✅ Completed',
+            weekLabel: 'Completed',
             weekStart: null,
             isCompleted: true
         };
@@ -62,7 +62,7 @@ function categorizeAssignment(assignment, currentWeekStart) {
     if (!assignment.dueDate) {
         return {
             weekKey: 'no-date',
-            weekLabel: '📋 No Due Date',
+            weekLabel: 'No Due Date',
             weekStart: null,
             isCompleted: false
         };
@@ -75,11 +75,11 @@ function categorizeAssignment(assignment, currentWeekStart) {
 
     let weekLabel;
     if (diffDays === 0) {
-        weekLabel = '📍 This Week';
+        weekLabel = 'This Week';
     } else if (diffDays === 7) {
-        weekLabel = '📅 Next Week';
+        weekLabel = 'Next Week';
     } else if (diffDays < 0) {
-        weekLabel = '⏰ Overdue';
+        weekLabel = 'Overdue';
     } else {
         const weekNum = Math.ceil(diffDays / 7) + 1;
         weekLabel = `Week ${weekNum} (${formatShortDate(weekStart)})`;

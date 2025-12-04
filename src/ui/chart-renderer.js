@@ -112,14 +112,14 @@ export function renderAllAssignments(container, estimates, pageType) {
         const title = cleanTitle(assignment.title);
         const { display, className } = getDueDateDisplay(assignment);
         const courseInfo = assignment.course && pageType === 'dashboard'
-            ? `<div class="assignment-course">📚 ${assignment.course}</div>`
+            ? `<div class="assignment-course">${assignment.course}</div>`
             : '';
 
         item.innerHTML = `
             ${courseInfo}
             <div class="assignment-title">${title}</div>
             <div class="assignment-meta">
-                <span class="assignment-estimate">⏱️ ${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</span>
+                <span class="assignment-estimate">${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</span>
                 <span class="${className}">${display}</span>
             </div>
         `;
@@ -141,19 +141,19 @@ function getDueDateDisplay(assignment) {
         const daysUntil = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
 
         if (daysUntil < 0) {
-            display = `⚠️ Overdue (${assignment.dueDate})`;
+            display = `Overdue (${assignment.dueDate})`;
             className += ' urgent';
         } else if (daysUntil <= 2) {
-            display = `🔥 Due ${assignment.dueDate}`;
+            display = `Due ${assignment.dueDate}`;
             className += ' urgent';
         } else {
-            display = `📅 Due ${assignment.dueDate}`;
+            display = `Due ${assignment.dueDate}`;
         }
     } else if (/\d+\s+out\s+of\s+\d+/i.test(assignment.title)) {
-        display = '✅ Completed';
+        display = 'Completed';
         className += ' completed';
     } else {
-        display = '📋 No due date';
+        display = 'No due date';
     }
 
     return { display, className };

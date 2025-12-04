@@ -66,11 +66,11 @@ function groupByWeek(estimates) {
 
         if (isCompleted) {
             weekKey = 'completed';
-            weekLabel = '✅ Completed';
+            weekLabel = 'Completed';
             weekStart = null;
         } else if (!assignment.dueDate) {
             weekKey = 'no-date';
-            weekLabel = '📋 No Due Date';
+            weekLabel = 'No Due Date';
             weekStart = null;
         } else {
             const dueDate = new Date(assignment.dueDate);
@@ -78,9 +78,9 @@ function groupByWeek(estimates) {
             weekKey = weekStart.toISOString().split('T')[0];
             const diffDays = Math.floor((weekStart - currentWeekStart) / (1000 * 60 * 60 * 24));
 
-            if (diffDays === 0) weekLabel = '📍 This Week';
-            else if (diffDays === 7) weekLabel = '📅 Next Week';
-            else if (diffDays < 0) weekLabel = '⏰ Overdue';
+            if (diffDays === 0) weekLabel = 'This Week';
+            else if (diffDays === 7) weekLabel = 'Next Week';
+            else if (diffDays < 0) weekLabel = 'Overdue';
             else weekLabel = `Week ${Math.ceil(diffDays / 7) + 1} (${formatDate(weekStart)})`;
         }
 
@@ -208,29 +208,29 @@ function renderAllAssignments(container, estimates, pageType) {
             const dueDate = new Date(assignment.dueDate);
             const daysUntil = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
             if (daysUntil < 0) {
-                dueDateDisplay = `⚠️ Overdue (${assignment.dueDate})`;
+                dueDateDisplay = `Overdue (${assignment.dueDate})`;
                 dueDateClass += ' urgent';
             } else if (daysUntil <= 2) {
-                dueDateDisplay = `🔥 Due ${assignment.dueDate}`;
+                dueDateDisplay = `Due ${assignment.dueDate}`;
                 dueDateClass += ' urgent';
             } else {
-                dueDateDisplay = `📅 Due ${assignment.dueDate}`;
+                dueDateDisplay = `Due ${assignment.dueDate}`;
             }
         } else if (/\d+\s+out\s+of\s+\d+/i.test(assignment.title)) {
-            dueDateDisplay = '✅ Completed';
+            dueDateDisplay = 'Completed';
             dueDateClass += ' completed';
         } else {
-            dueDateDisplay = '📋 No due date';
+            dueDateDisplay = 'No due date';
         }
 
         const courseInfo = assignment.course && pageType === 'dashboard'
-            ? `<div class="assignment-course">📚 ${assignment.course}</div>` : '';
+            ? `<div class="assignment-course">${assignment.course}</div>` : '';
 
         item.innerHTML = `
             ${courseInfo}
             <div class="assignment-title">${title}</div>
             <div class="assignment-meta">
-                <span class="assignment-estimate">⏱️ ${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</span>
+                <span class="assignment-estimate">${assignment.estimate} ${typeof assignment.estimate === 'number' ? 'hours' : ''}</span>
                 <span class="${dueDateClass}">${dueDateDisplay}</span>
             </div>
         `;
